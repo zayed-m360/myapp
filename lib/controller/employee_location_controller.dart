@@ -1,28 +1,40 @@
 import 'dart:convert';
-
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:myapp/json/employee_location.dart';
 
 import '../model/employee_location_model.dart';
 
 class GetEmployeeLocationModelController extends GetxController {
-  Rx<EmployeeLocationModel> employeeLocationModel = EmployeeLocationModel().obs;
-  RxBool isLoading = true.obs;
+  var selectedDate = Rxn<DateTime>();
+  var startTime = Rxn<TimeOfDay>();
+  var endTime = Rxn<TimeOfDay>();
+  var employeeLocations = <LocationWithTIme>[].obs;
+  RxString selectedEmployee = ''.obs;
 
-  @override
-  void onInit() {
-    super.onInit();
-    getEmployeeLocationModel();
+  void setDate(DateTime date) {
+    selectedDate.value = date;
   }
 
-  Future getEmployeeLocationModel() async {
-    try {
-      var response = employeeLocation;
+  void setStartTime(TimeOfDay time) {
+    startTime.value = time;
+  }
 
-      employeeLocationModel.value = employeeLocationModelFromJson(jsonEncode(response));
+  void setEndTime(TimeOfDay time) {
+    endTime.value = time;
+  }
+
+  Rx<EmployeeLocationModel> employeeLocationModel = EmployeeLocationModel().obs;
+  RxBool isLoading = false.obs;
+
+  Future<void> getEmployeeLocationModel() async {
+    try {
+      var response = employeeLocation;  // Mock API response
+
+      employeeLocationModel.value =
+          employeeLocationModelFromJson(jsonEncode(response));
+      employeeLocations.value = employeeLocationModel.value.data?.locations ?? [];
       isLoading(false);
-      return employeeLocationModel.value;
     } catch (e) {
       debugPrint("Error: $e");
       isLoading(false);

@@ -35,7 +35,7 @@ class EmployeeLocationModel {
 class EmployeeLocationData {
     String? name;
     int? id;
-    List<Location>? locations;
+    List<LocationWithTIme>? locations;
 
     EmployeeLocationData({
         this.name,
@@ -46,7 +46,7 @@ class EmployeeLocationData {
     factory EmployeeLocationData.fromJson(Map<String, dynamic> json) => EmployeeLocationData(
         name: json["name"],
         id: json["id"],
-        locations: json["locations"] == null ? [] : List<Location>.from(json["locations"]!.map((x) => Location.fromJson(x))),
+        locations: json["locations"] == null ? [] : List<LocationWithTIme>.from(json["locations"]!.map((x) => LocationWithTIme.fromJson(x))),
     );
 
     Map<String, dynamic> toJson() => {
@@ -56,18 +56,18 @@ class EmployeeLocationData {
     };
 }
 
-class Location {
+class LocationWithTIme {
     String? time;
     double? lat;
     double? long;
 
-    Location({
+    LocationWithTIme({
         this.time,
         this.lat,
         this.long,
     });
 
-    factory Location.fromJson(Map<String, dynamic> json) => Location(
+    factory LocationWithTIme.fromJson(Map<String, dynamic> json) => LocationWithTIme(
         time: json["time"],
         lat: json["lat"]?.toDouble(),
         long: json["long"]?.toDouble(),

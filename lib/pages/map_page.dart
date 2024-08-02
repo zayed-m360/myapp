@@ -1,5 +1,9 @@
+// ignore_for_file: deprecated_member_use
+
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +11,8 @@ import 'package:myapp/constants/constants.dart';
 import '../widgets/app_dropdown.dart';
 
 class MapPage extends StatefulWidget {
+  static const LatLng m360 = LatLng(23.788752945834084, 90.40882928334105);
+
   const MapPage({super.key});
 
   @override
@@ -14,26 +20,21 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  static const LatLng m360 = LatLng(23.788934724471485, 90.40879178077513);
-  BitmapDescriptor customIcon = BitmapDescriptor.defaultMarker; // Default icon
-  BitmapDescriptor pointIcon = BitmapDescriptor.defaultMarker; // Default icon
-
-  DateTime? selectedDate;
-  TimeOfDay? startTime;
-  TimeOfDay? endTime;
-  List<String> employeeList = ["Zayed", "Robiul", "Shamol", "Soton"];
-  String? selectedEmployee;
-
   @override
   void initState() {
-    super.initState();
     _loadOfficeIcon();
     _loadPointIcon();
-    getEmployeeLocationController.getEmployeeLocationModel();
+    super.initState();
   }
 
+  final Completer<GoogleMapController> _mapController = Completer();
+
+  BitmapDescriptor officeIcon = BitmapDescriptor.defaultMarker;
+  // Default icon
+  BitmapDescriptor pointIcon = BitmapDescriptor.defaultMarker;
+  // Default icon
   Future<void> _loadOfficeIcon() async {
-    customIcon = await BitmapDescriptor.fromAssetImage(
+    officeIcon = await BitmapDescriptor.fromAssetImage(
       const ImageConfiguration(size: Size(48, 48)),
       'assets/office.png',
     );
@@ -48,40 +49,6 @@ class _MapPageState extends State<MapPage> {
     setState(() {});
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null && picked != selectedDate) {
-      setState(() {
-        selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _selectTime(BuildContext context, bool isStartTime) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStartTime) {
-          startTime = picked;
-        } else {
-          endTime = picked;
-        }
-      });
-    }
-  }
-
-  void _submit() {
-    getEmployeeLocationController.getEmployeeLocationModel();
-  }
-
   Future<String> _getAddressFromLatLng(double lat, double lng) async {
     List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
     if (placemarks.isNotEmpty) {
@@ -91,23 +58,25 @@ class _MapPageState extends State<MapPage> {
     return "No address available";
   }
 
-  Future<List<Marker>> _createMarkers() async {
-    var address =await _getAddressFromLatLng(m360.latitude, m360.longitude);
-    List<Marker> markers = [
+  Future<Set<Marker>> _createMarkers() async {
+    var address = await _getAddressFromLatLng(
+        MapPage.m360.latitude, MapPage.m360.longitude);
+    Set<Marker> markers = {
       Marker(
-        markerId: const MarkerId("Office"),
-        position: m360,
-        icon: customIcon,
+        markerId: const MarkerId("M360 ICT"),
+        position: MapPage.m360,
+        icon: officeIcon,
         infoWindow: InfoWindow(
           snippet: address,
-          title: "Office",
+          title: "M360 ICT",
         ),
       ),
-    ];
+    };
 
-    if (getEmployeeLocationController.employeeLocationModel.value.data?.locations != null) {
-      for (var location in getEmployeeLocationController.employeeLocationModel.value.data!.locations!) {
-        var address =await _getAddressFromLatLng(location.lat!, location.long!);
+    if (getEmployeeLocationController.employeeLocations.isNotEmpty) {
+      for (var location in getEmployeeLocationController.employeeLocations) {
+        var address =
+            await _getAddressFromLatLng(location.lat!, location.long!);
         markers.add(
           Marker(
             markerId: MarkerId(location.time ?? ''),
@@ -125,6 +94,48 @@ class _MapPageState extends State<MapPage> {
     return markers;
   }
 
+  LatLngBounds _calculateBounds(Set<Marker> markers) {
+    LatLngBounds bounds;
+    if (markers.length == 1) {
+      bounds = LatLngBounds(
+        southwest: markers.first.position,
+        northeast: markers.first.position,
+      );
+    } else {
+      bounds = markers.fold<LatLngBounds>(
+        LatLngBounds(
+          southwest: markers.first.position,
+          northeast: markers.first.position,
+        ),
+        (previous, marker) => LatLngBounds(
+          southwest: LatLng(
+            (previous.southwest.latitude < marker.position.latitude)
+                ? previous.southwest.latitude
+                : marker.position.latitude,
+            (previous.southwest.longitude < marker.position.longitude)
+                ? previous.southwest.longitude
+                : marker.position.longitude,
+          ),
+          northeast: LatLng(
+            (previous.northeast.latitude > marker.position.latitude)
+                ? previous.northeast.latitude
+                : marker.position.latitude,
+            (previous.northeast.longitude > marker.position.longitude)
+                ? previous.northeast.longitude
+                : marker.position.longitude,
+          ),
+        ),
+      );
+    }
+    return bounds;
+  }
+
+  void _updateMapBounds(
+      GoogleMapController controller, Set<Marker> markers) async {
+    final bounds = _calculateBounds(markers);
+    await controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -136,14 +147,12 @@ class _MapPageState extends State<MapPage> {
         child: Column(
           children: [
             AppDropdown(
-              value: selectedEmployee,
+              value: getEmployeeLocationController.selectedEmployee.value,
               label: "Employee",
               hint: "Select an employee",
-              itemList: employeeList,
+              itemList: const ["Zayed", "Robiul", "Shamol", "Soton"],
               onChanged: (val) {
-                setState(() {
-                  selectedEmployee = val;
-                });
+                getEmployeeLocationController.selectedEmployee.value = val!;
               },
               itemBuilder: (item) => DropdownMenuItem(
                 value: item,
@@ -163,60 +172,101 @@ class _MapPageState extends State<MapPage> {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: () => _selectDate(context),
+                      onTap: () async {
+                        DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2101),
+                        );
+                        if (picked != null) {
+                          getEmployeeLocationController.setDate(picked);
+                        }
+                      },
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.amber,
                           borderRadius: BorderRadius.circular(5),
                         ),
                         padding: const EdgeInsets.all(5),
-                        child: Text(
-                          selectedDate == null
-                              ? 'Choose Date'
-                              : DateFormat('yyyy-MM-dd').format(selectedDate!),
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
+                        child: Obx(() => Text(
+                              getEmployeeLocationController
+                                          .selectedDate.value ==
+                                      null
+                                  ? 'Choose Date'
+                                  : DateFormat('yyyy-MM-dd').format(
+                                      getEmployeeLocationController
+                                          .selectedDate.value!),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
+                            )),
                       ),
                     ),
-                    const SizedBox(
-                      width: 10,
-                    ),
+                    const SizedBox(width: 10),
                     GestureDetector(
-                      onTap: () => _selectTime(context, true),
+                      onTap: () async {
+                        TimeOfDay? picked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (picked != null) {
+                          getEmployeeLocationController.setStartTime(picked);
+                        }
+                      },
                       child: Container(
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(5),
                             border: Border.all(width: 1, color: Colors.amber)),
                         padding: const EdgeInsets.all(5),
-                        child: Text(
-                          startTime == null
-                              ? 'Start Time'
-                              : startTime!.format(context),
-                        ),
+                        child: Obx(() => Text(
+                              getEmployeeLocationController.startTime.value ==
+                                      null
+                                  ? 'Start Time'
+                                  : getEmployeeLocationController
+                                      .startTime.value!
+                                      .format(context),
+                            )),
                       ),
                     ),
                     const Text(" - "),
                     GestureDetector(
-                      onTap: () => _selectTime(context, false),
+                      onTap: () async {
+                        TimeOfDay? picked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (picked != null) {
+                          getEmployeeLocationController.setEndTime(picked);
+                        }
+                      },
                       child: Container(
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(5),
                             border: Border.all(width: 1, color: Colors.amber)),
                         padding: const EdgeInsets.all(5),
-                        child: Text(
-                          endTime == null
-                              ? 'End Time'
-                              : endTime!.format(context),
-                        ),
+                        child: Obx(() => Text(
+                              getEmployeeLocationController.endTime.value ==
+                                      null
+                                  ? 'End Time'
+                                  : getEmployeeLocationController.endTime.value!
+                                      .format(context),
+                            )),
                       ),
                     ),
                   ],
                 ),
                 GestureDetector(
-                  onTap: () => _submit(),
+                  onTap: () async {
+                    await getEmployeeLocationController
+                        .getEmployeeLocationModel();
+                    final GoogleMapController controller =
+                        await _mapController.future;
+                    final markers = await _createMarkers();
+                    _updateMapBounds(controller, markers);
+                  },
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.amber,
@@ -230,68 +280,34 @@ class _MapPageState extends State<MapPage> {
             ),
             const SizedBox(height: 10),
             Expanded(
-              child: FutureBuilder<List<Marker>>(
-                future: _createMarkers(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              child: Obx(() {
+                if (getEmployeeLocationController.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-                  final markers = snapshot.data!;
-                  LatLngBounds bounds;
-                  if (markers.length == 1) {
-                    bounds = LatLngBounds(
-                      southwest: markers.first.position,
-                      northeast: markers.first.position,
-                    );
-                  } else {
-                    bounds = markers.fold<LatLngBounds>(
-                      LatLngBounds(
-                        southwest: markers.first.position,
-                        northeast: markers.first.position,
-                      ),
-                      (previous, marker) => LatLngBounds(
-                        southwest: LatLng(
-                          (previous.southwest.latitude <
-                                  marker.position.latitude)
-                              ? previous.southwest.latitude
-                              : marker.position.latitude,
-                          (previous.southwest.longitude <
-                                  marker.position.longitude)
-                              ? previous.southwest.longitude
-                              : marker.position.longitude,
-                        ),
-                        northeast: LatLng(
-                          (previous.northeast.latitude >
-                                  marker.position.latitude)
-                              ? previous.northeast.latitude
-                              : marker.position.latitude,
-                          (previous.northeast.longitude >
-                                  marker.position.longitude)
-                              ? previous.northeast.longitude
-                              : marker.position.longitude,
-                        ),
-                      ),
-                    );
-                  }
+                return FutureBuilder<Set<Marker>>(
+                  future: _createMarkers(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                  return GoogleMap(
-                    buildingsEnabled: false,
-                    compassEnabled: true,
-                    mapType: MapType.terrain,
-                    initialCameraPosition:
-                        const CameraPosition(target: m360, zoom: 15),
-                    markers: markers.toSet(),
-                    onMapCreated: (GoogleMapController controller) {
-                      Future.delayed(const Duration(milliseconds: 100))
-                          .then((_) {
-                        controller.animateCamera(
-                            CameraUpdate.newLatLngBounds(bounds, 50));
-                      });
-                    },
-                  );
-                },
-              ),
+                    final markers = snapshot.data!;
+
+                    return GoogleMap(
+                      buildingsEnabled: false,
+                      compassEnabled: true,
+                      mapType: MapType.terrain,
+                      initialCameraPosition:
+                          const CameraPosition(target: MapPage.m360, zoom: 15),
+                      markers: markers,
+                      onMapCreated: (GoogleMapController controller) {
+                        _mapController.complete(controller);
+                      },
+                    );
+                  },
+                );
+              }),
             ),
           ],
         ),
