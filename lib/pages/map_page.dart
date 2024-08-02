@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -7,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:myapp/constants/constants.dart';
 import '../widgets/app_dropdown.dart';
 
@@ -30,9 +29,7 @@ class _MapPageState extends State<MapPage> {
   final Completer<GoogleMapController> _mapController = Completer();
 
   BitmapDescriptor officeIcon = BitmapDescriptor.defaultMarker;
-  // Default icon
   BitmapDescriptor pointIcon = BitmapDescriptor.defaultMarker;
-  // Default icon
   Future<void> _loadOfficeIcon() async {
     officeIcon = await BitmapDescriptor.fromAssetImage(
       const ImageConfiguration(size: Size(48, 48)),
@@ -90,7 +87,6 @@ class _MapPageState extends State<MapPage> {
         );
       }
     }
-
     return markers;
   }
 
@@ -136,6 +132,8 @@ class _MapPageState extends State<MapPage> {
     await controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
   }
 
+  Timer? _debounce;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,139 +144,149 @@ class _MapPageState extends State<MapPage> {
         padding: const EdgeInsets.all(10.0),
         child: Column(
           children: [
-            AppDropdown(
-              value: getEmployeeLocationController.selectedEmployee.value,
-              label: "Employee",
-              hint: "Select an employee",
-              itemList: const ["Zayed", "Robiul", "Shamol", "Soton"],
-              onChanged: (val) {
-                getEmployeeLocationController.selectedEmployee.value = val!;
-              },
-              itemBuilder: (item) => DropdownMenuItem(
-                value: item,
-                child: Text(
-                  item.toString().split(" ").first,
-                  style: const TextStyle(
-                      color: Colors.black45,
-                      fontFamily: 'Quicksand',
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        DateTime? picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2101),
-                        );
-                        if (picked != null) {
-                          getEmployeeLocationController.setDate(picked);
-                        }
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.amber,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        padding: const EdgeInsets.all(5),
-                        child: Obx(() => Text(
-                              getEmployeeLocationController
-                                          .selectedDate.value ==
-                                      null
-                                  ? 'Choose Date'
-                                  : DateFormat('yyyy-MM-dd').format(
-                                      getEmployeeLocationController
-                                          .selectedDate.value!),
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
-                            )),
+                Expanded(
+                  child: AppDropdown(
+                    value: getEmployeeLocationController.selectedEmployee.value,
+                    label: "Employee",
+                    hint: "Select an employee",
+                    itemList: const ["Zayed", "Robiul", "Shamol", "Soton"],
+                    onChanged: (val) {
+                      getEmployeeLocationController.selectedEmployee.value =
+                          val!;
+                    },
+                    itemBuilder: (item) => DropdownMenuItem(
+                      value: item,
+                      child: Text(
+                        item.toString().split(" ").first,
+                        style: const TextStyle(
+                            color: Colors.black45,
+                            fontFamily: 'Quicksand',
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: () async {
-                        TimeOfDay? picked = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.now(),
-                        );
-                        if (picked != null) {
-                          getEmployeeLocationController.setStartTime(picked);
-                        }
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(width: 1, color: Colors.amber)),
-                        padding: const EdgeInsets.all(5),
-                        child: Obx(() => Text(
-                              getEmployeeLocationController.startTime.value ==
-                                      null
-                                  ? 'Start Time'
-                                  : getEmployeeLocationController
-                                      .startTime.value!
-                                      .format(context),
-                            )),
-                      ),
-                    ),
-                    const Text(" - "),
-                    GestureDetector(
-                      onTap: () async {
-                        TimeOfDay? picked = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.now(),
-                        );
-                        if (picked != null) {
-                          getEmployeeLocationController.setEndTime(picked);
-                        }
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(width: 1, color: Colors.amber)),
-                        padding: const EdgeInsets.all(5),
-                        child: Obx(() => Text(
-                              getEmployeeLocationController.endTime.value ==
-                                      null
-                                  ? 'End Time'
-                                  : getEmployeeLocationController.endTime.value!
-                                      .format(context),
-                            )),
-                      ),
-                    ),
-                  ],
+                  ),
+                ),
+                const SizedBox(
+                  width: 5,
                 ),
                 GestureDetector(
                   onTap: () async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2101),
+                    );
+                    if (picked != null) {
+                      getEmployeeLocationController.setDate(picked);
+                    }
+                  },
+                  child: Container(
+                    height: 55,
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    padding: const EdgeInsets.all(5),
+                    child: Center(
+                      child: Obx(
+                        () => Text(
+                          getEmployeeLocationController.selectedDate.value == null
+                              ? 'Choose Date'
+                              : DateFormat('yyyy-MM-dd').format(
+                                  getEmployeeLocationController
+                                      .selectedDate.value!),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Obx(() {
+              double startValue =
+                  getEmployeeLocationController.startTime.value != null
+                      ? getEmployeeLocationController.startTime.value!.hour *
+                              60.0 +
+                          getEmployeeLocationController.startTime.value!.minute
+                      : 540.0;
+              double endValue = getEmployeeLocationController.endTime.value !=
+                      null
+                  ? getEmployeeLocationController.endTime.value!.hour * 60.0 +
+                      getEmployeeLocationController.endTime.value!.minute
+                  : 1080.0;
+
+              return SfRangeSelector(
+                min: 0.0,
+                max: 1439.0,
+                interval: 240.0,
+                stepSize: 1.0,
+                showDividers: true,
+                initialValues: SfRangeValues(startValue, endValue),
+                activeColor: Colors.amber,
+                enableTooltip: true,
+                labelFormatterCallback:
+                    (dynamic actualValue, String formattedText) {
+                  final int minutes = actualValue.toInt();
+                  final int hours = minutes ~/ 60;
+                  final int remainingMinutes = minutes % 60;
+                  final TimeOfDay time =
+                      TimeOfDay(hour: hours, minute: remainingMinutes);
+                  return time.format(context);
+                },
+                tooltipTextFormatterCallback:
+                    (dynamic actualValue, String formattedText) {
+                  final int minutes = actualValue.toInt();
+                  final int hours = minutes ~/ 60;
+                  final int remainingMinutes = minutes % 60;
+                  final TimeOfDay time =
+                      TimeOfDay(hour: hours, minute: remainingMinutes);
+                  return time.format(context);
+                },
+                labelPlacement: LabelPlacement.betweenTicks,
+                showTicks: true,
+                showLabels: true,
+                tooltipShape: const SfPaddleTooltipShape(),
+                startThumbIcon: const Icon(
+                  Iconsax.clock,
+                  color: Colors.white,
+                  size: 15,
+                ),
+                endThumbIcon: const Icon(
+                  Iconsax.clock,
+                  color: Colors.white,
+                  size: 15,
+                ),
+                onChanged: (SfRangeValues values) {
+                  getEmployeeLocationController.setStartTime(TimeOfDay(
+                      hour: values.start ~/ 60,
+                      minute: (values.start % 60).toInt()));
+                  getEmployeeLocationController.setEndTime(TimeOfDay(
+                      hour: values.end ~/ 60,
+                      minute: (values.end % 60).toInt()));
+
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                  _debounce = Timer(const Duration(seconds: 1), () async {
                     await getEmployeeLocationController
                         .getEmployeeLocationModel();
                     final GoogleMapController controller =
                         await _mapController.future;
                     final markers = await _createMarkers();
                     _updateMapBounds(controller, markers);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.amber,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    padding: const EdgeInsets.all(5),
-                    child: const Icon(Iconsax.send_1, color: Colors.white),
-                  ),
+                  });
+                },
+                child: const SizedBox(
+                  width: double.maxFinite,
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
+              );
+            }),
+            const SizedBox(height: 50),
             Expanded(
               child: Obx(() {
                 if (getEmployeeLocationController.isLoading.value) {
@@ -296,10 +304,11 @@ class _MapPageState extends State<MapPage> {
 
                     return GoogleMap(
                       buildingsEnabled: false,
+                      rotateGesturesEnabled: true,
+                      zoomGesturesEnabled: true,
                       compassEnabled: true,
                       mapType: MapType.terrain,
-                      initialCameraPosition:
-                          const CameraPosition(target: MapPage.m360, zoom: 15),
+                      initialCameraPosition: const CameraPosition(target: MapPage.m360, zoom: 15),
                       markers: markers,
                       onMapCreated: (GoogleMapController controller) {
                         _mapController.complete(controller);

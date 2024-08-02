@@ -29,8 +29,8 @@ class GetEmployeeLocationModelController extends GetxController {
 
   Future<void> getEmployeeLocationModel() async {
     try {
-      var response = employeeLocation;  // Mock API response
-
+      isLoading(true);
+      var response = employeeLocation; // Mock API response
       employeeLocationModel.value =
           employeeLocationModelFromJson(jsonEncode(response));
       employeeLocations.value = employeeLocationModel.value.data?.locations ?? [];
